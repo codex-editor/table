@@ -1,5 +1,6 @@
 import './styles/border-toolbar.pcss';
 import svgPlusButton from './img/plus.svg';
+import svgMinusButton from './img/minus.svg';
 import {create} from './documentUtils';
 
 const CSS = {
@@ -10,8 +11,13 @@ const CSS = {
   verticalToolBar: 'tc-toolbar--ver',
   verticalHighlightingLine: 'tc-toolbar__shine-line--ver',
   plusButton: 'tc-toolbar__plus',
+  plusButtonHidden: 'tc-toolbar__plus--hidden',
+  minusButton: 'tc-toolbar__minus',
+  minusButtonHidden: 'tc-toolbar__minus--hidden',
   horizontalPlusButton: 'tc-toolbar__plus--hor',
   verticalPlusButton: 'tc-toolbar__plus--ver',
+  horizontalMinusButton: 'tc-toolbar__minus--hor',
+  verticalMinusButton: 'tc-toolbar__minus--ver',
   area: 'tc-table__area',
 };
 
@@ -24,8 +30,9 @@ class BorderToolBar {
    */
   constructor() {
     this._plusButton = this._generatePlusButton();
+    this._minusButton = this._generateMinusButton();
     this._highlightingLine = this._generateHighlightingLine();
-    this._toolbar = this._generateToolBar([this._plusButton, this._highlightingLine]);
+    this._toolbar = this._generateToolBar([this._plusButton,this._minusButton, this._highlightingLine]);
   }
 
   /**
@@ -68,7 +75,20 @@ class BorderToolBar {
     button.innerHTML = svgPlusButton;
     button.addEventListener('click', (event) => {
       event.stopPropagation();
-      const e = new CustomEvent('click', {'detail': {'x': event.pageX, 'y': event.pageY}, 'bubbles': true});
+      const e = new CustomEvent('click', {'detail': {'x': event.pageX, 'y': event.pageY, 'button':'plus'}, 'bubbles': true});
+
+      this._toolbar.dispatchEvent(e);
+    });
+    return button;
+  }
+
+  _generateMinusButton() {
+    const button = create('div', [CSS.minusButton]);
+
+    button.innerHTML = svgMinusButton;
+    button.addEventListener('click', (event) => {
+      event.stopPropagation();
+      const e = new CustomEvent('click', {'detail': {'x': event.pageX, 'y': event.pageY, 'button':'minus'}, 'bubbles': true});
 
       this._toolbar.dispatchEvent(e);
     });
@@ -121,6 +141,7 @@ class BorderToolBar {
 
     if (area !== null && area.classList.contains(CSS.area)) {
       const e = new MouseEvent('mouseover', {clientX: event.pageX, clientY: event.pageY});
+
       area.dispatchEvent(e);
     }
   }
@@ -144,9 +165,17 @@ export class HorizontalBorderToolBar extends BorderToolBar {
   /**
    * Move ToolBar to y coord
    * @param {number} y - coord
+   * @param {boolean} withDelete - enables delete button
    */
-  showIn(y) {
+  showIn(y, withDelete = true) {
     const halfHeight = Math.floor(Number.parseInt(window.getComputedStyle(this._toolbar).height) / 2);
+
+    this._plusButton.classList.remove(CSS.horizontalMinusButton);
+    this._minusButton.classList.add(CSS.minusButtonHidden);
+    if (withDelete) {
+      this._plusButton.classList.add(CSS.horizontalMinusButton);
+      this._minusButton.classList.remove(CSS.minusButtonHidden);
+    }
 
     this._toolbar.style.top = (y - halfHeight) + 'px';
     this.show();
@@ -171,9 +200,17 @@ export class VerticalBorderToolBar extends BorderToolBar {
   /**
    * Move ToolBar to x coord
    * @param {number} x - coord
+   * @param {boolean} withDelete - enables delete button
    */
-  showIn(x) {
+  showIn(x, withDelete = true) {
     const halfWidth = Math.floor(Number.parseInt(window.getComputedStyle(this._toolbar).width) / 2);
+
+    this._plusButton.classList.remove(CSS.verticalMinusButton);
+    this._minusButton.classList.add(CSS.minusButtonHidden);
+    if (withDelete) {
+      this._plusButton.classList.add(CSS.verticalMinusButton);
+      this._minusButton.classList.remove(CSS.minusButtonHidden);
+    }
 
     this._toolbar.style.left = (x - halfWidth) + 'px';
     this.show();

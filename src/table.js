@@ -1,18 +1,27 @@
 import { create, getCoords, getSideByCoords } from './documentUtils';
+import { setActiveColRow } from './tableHelpers';
 import './styles/table.pcss';
 
 const CSS = {
   table: 'tc-table',
   inputField: 'tc-table__inp',
+  row: 'tc-table__row',
+  rowDeletable: 'tc-table__row--deletable',
   cell: 'tc-table__cell',
+  cellDeletable: 'tc-table__cell--deletable',
   wrapper: 'tc-table__wrap',
-  area: 'tc-table__area',
+  area: 'tc-table__area'
 };
 
 /**
  * Generates and manages _table contents.
  */
 export class Table {
+
+  get CSS () {
+    return CSS;
+  }
+
   /**
    * Creates
    *
@@ -21,7 +30,6 @@ export class Table {
   constructor(readOnly) {
     this.readOnly = readOnly;
     this._numberOfColumns = 0;
-    this._numberOfRows = 0;
     this._element = this._createTableWrapper();
     this._table = this._element.querySelector('table');
 
@@ -31,35 +39,372 @@ export class Table {
   }
 
   /**
+   * Returns the number of current columns
+   *
+   * @returns {number}
+   */
+  cellCount() {
+    return this._numberOfColumns;
+  }
+
+  /**
+   * Returns the last active cell
+   *
+   * @returns {boolean}
+   */
+  hasActiveCell() {
+    return !!this._table.dataset.activeCell;
+  }
+
+  /**
+   * Returns the last active cell
+   *
+   * @returns {string|number}
+   */
+  activeCell() {
+    return parseInt(this._table.dataset.activeCell || 0);
+  }
+
+  /**
+   * Checks if active column is first
+   *
+   * @returns {boolean}
+   */
+  isFirstCellActive() {
+    return this.activeCell() === 0;
+  }
+
+  /**
+   * Checks if active column is last
+   *
+   * @returns {boolean}
+   */
+  isLastCellActive() {
+    return this.activeCell() + 1 === this._numberOfColumns;
+  }
+
+  /**
+   * Removes active state from row / cells
+   */
+  _clearState() {
+    for (let rowIdx = 0; rowIdx < this._table.rows.length; rowIdx++) {
+      this._table.rows[rowIdx].classList.remove(CSS.rowDeletable);
+
+      for (let cellIdx = 0; cellIdx < this._numberOfColumns; cellIdx++) {
+        this._table.rows[rowIdx].cells[cellIdx].classList.remove(CSS.cellDeletable);
+      }
+    }
+  }
+
+  _setRowState(rowIdx, state) {
+    if (this._table.rows[rowIdx]) {
+      this._table.rows[rowIdx].classList.add(state);
+    }
+  }
+
+  _setColumnState(cellIdx, state) {
+    for (let rowIdx = 0; rowIdx < this._table.rows.length; rowIdx++) {
+      if (this._table.rows[rowIdx].cells[cellIdx]) {
+        this._table.rows[rowIdx].cells[cellIdx].classList.add(state);
+      }
+    }
+  }
+
+  activateFirstRow() {
+    this._setRowState(0, CSS.rowDeletable);
+  }
+
+  activateLastRow() {
+    this._setRowState(this._table.rows.length - 1, CSS.rowDeletable);
+  }
+
+  activateCurrentRow() {
+    this._setRowState(this.activeRow(), CSS.rowDeletable);
+  }
+
+  activateTopRowForToolbar() {
+    this._setRowState(this.activeRow() - 1, CSS.rowDeletable);
+  }
+
+  activateBottomRowForToolbar() {
+    this._setRowState(this.activeRow() + 1, CSS.rowDeletable);
+  }
+
+  activateFirstColumn() {
+    this._setColumnState(0, CSS.cellDeletable);
+  }
+
+  activateLastColumn() {
+    this._setColumnState(this._numberOfColumns - 1, CSS.cellDeletable);
+  }
+
+  activateCurrentColumn() {
+    this._setColumnState(this.activeCell(), CSS.cellDeletable);
+  }
+
+  activateLeftColumnForToolbar() {
+    this._setColumnState(this.activeCell() - 1, CSS.cellDeletable);
+  }
+
+  activateRightColumnForToolbar() {
+    this._setColumnState(this.activeCell() + 1, CSS.cellDeletable);
+  }
+
+  /**
+   * Returns the number of current rows
+   *
+   * @returns {number}
+   */
+  rowCount() {
+    return this._table.rows.length;
+  }
+
+  /**
+   * Returns the last active cell
+   *
+   * @returns {boolean}
+   */
+  hasActiveRow() {
+    return !!this._table.dataset.activeRow;
+  }
+
+  /**
+   * Returns the last active row
+   *
+   * @returns {string|number}
+   */
+  activeRow() {
+    return parseInt(this._table.dataset.activeRow || 0);
+  }
+
+  /**
+   * Checks if active row is first
+   *
+   * @returns {boolean}
+   */
+  isFirstRowActive() {
+    return this.activeRow() === 0;
+  }
+
+  /**
+   * Checks if active row is last
+   *
+   * @returns {boolean}
+   */
+  isLastRowActive() {
+    return this.activeRow() + 1 === this._table.rows.length;
+  }
+
+  /**
    * Add column in table on index place
    *
-   * @param {number} index - number in the array of columns, where new column to insert,-1 if insert at the end
+   * @param {number} cellIndex - 0 = Insert in the beginning of each row, all others will move to the right
    */
-  addColumn(index = -1) {
-    this._numberOfColumns++;
-    /** Add cell in each row */
+  addColumn(cellIndex = 0) {
     const rows = this._table.rows;
 
     for (let i = 0; i < rows.length; i++) {
-      const cell = rows[i].insertCell(index);
+      const cell = rows[i].insertCell(cellIndex);
 
       this._fillCell(cell);
     }
+
+    this._numberOfColumns++;
+  };
+
+  addColumnAtBeginning() {
+    this.addColumn(0);
+  }
+
+  addColumnAtEnd() {
+    this.addColumn(this._numberOfColumns);
+  }
+
+  /**
+   * Add column to the left of the active td-index
+   *
+   * @param {number} cellIndex - current active td
+   */
+  addColumnLeft(cellIndex) {
+    this.addColumn(cellIndex);
+  }
+
+  /**
+   * Add column to the left of the active td-index
+   *
+   * @param {number} cellIndex - current active td.cellIndex
+   */
+  addColumnRight(cellIndex) {
+    this.addColumn(cellIndex + 1);
+  }
+
+  /**
+   * Remove column in table on index place
+   *
+   * @param {number} cellIndex - will remove the td.cellIndex in every row
+   */
+  removeColumn(cellIndex = 0) {
+    if (cellIndex < 0) { // cannot remove negative index
+      return;
+    }
+
+    const rows = this._table.rows;
+
+    if (rows.length === 0 || this._numberOfColumns <= 1) { // avoid deletion of last row/col
+      return;
+    }
+
+    for (let i = 0; i < rows.length; i++) {
+      rows[i].deleteCell(cellIndex);
+    }
+
+    this._numberOfColumns--;
+  };
+
+  removeFirstColumn() {
+    this.removeColumn(0);
+  }
+
+  removeLastColumn() {
+    this.removeColumn(this._numberOfColumns - 1);
+  }
+
+  /**
+   * Remove column in table on index place
+   *
+   * @param {number} cellIndex - will remove the td.cellIndex in every row
+   */
+  removeColumnLeft(cellIndex = 0) {
+    this.removeColumn(cellIndex - 1);
+  };
+
+  /**
+   * Remove column in table on index place
+   *
+   * @param {number} cellIndex - will remove the td.cellIndex in every row
+   */
+  removeColumnRight(cellIndex = 0) {
+    if (this._numberOfColumns === cellIndex + 1) { // avoid deletion if column itself is last
+      return;
+    }
+    this.removeColumn(cellIndex + 1);
   };
 
   /**
    * Add row in table on index place
    *
-   * @param {number} index - number in the array of columns, where new column to insert,-1 if insert at the end
-   * @returns {HTMLElement} row
+   * @param {number} rowIndex - 0 = will put a new row on the beginning of the table and move all others below
+   * @returns {HTMLElement}
    */
-  addRow(index = -1) {
-    this._numberOfRows++;
-    const row = this._table.insertRow(index);
+  addRow(rowIndex = 0) {
+    const row = this._table.insertRow(rowIndex);
 
-    this._fillRow(row);
+    row.classList.add(CSS.row);
+
+    for (let i = 0; i < this._numberOfColumns; i++) {
+      const cell = row.insertCell();
+
+      this._fillCell(cell);
+    }
 
     return row;
+  };
+
+  addRowAtBeginning() {
+    this.addRow(0);
+  }
+
+  addRowAtEnd() {
+    this.addRow(this._table.rows.length);
+  }
+
+  /**
+   * Adds a new row above the rowIndex
+   *
+   * @param {number} rowIndex
+   * @returns {HTMLElement}
+   */
+  addRowAbove(rowIndex) {
+    return this.addRow(rowIndex);
+  };
+
+  /**
+   * Adds a new row below the rowIndex
+   *
+   * @param {number} rowIndex
+   * @returns {HTMLElement}
+   */
+  addRowBelow(rowIndex) {
+    const rows = this._table.rows.length;
+
+    rowIndex = rowIndex + 1;
+
+    if (rowIndex > rows) { // Invalid rowIndex will append a new row at the end
+      return this.addRow(rows);
+    }
+
+    return this.addRow(rowIndex); // Add new row below rowIndex
+  };
+
+  /**
+   * Remove row in table on index place
+   *
+   * @param {number} rowIndex - number in the array of columns, where new column to insert,-1 if insert at the end
+   */
+  removeRow(rowIndex = 0) {
+    if (this._table.rows.length <= 1) { // avoid deletion of last row
+      return;
+    }
+
+    this._table.deleteRow(rowIndex);
+  };
+
+  /**
+   * Removes the last row in the table
+   */
+  removeFirstRow() {
+    this.removeRow(0);
+  }
+
+  /**
+   * Removes the last row in the table
+   */
+  removeLastRow() {
+    this.removeRow(this._table.rows.length - 1);
+  }
+
+  /**
+   * Remove row above the given index
+   *
+   * @param {number} rowIndex - number in the array of columns, where new column to insert,-1 if insert at the end
+   */
+  removeRowAbove(rowIndex = 0) {
+    if (this._table.rows.length === 1) { // avoid deletion of first/last row
+      return;
+    }
+
+    if (rowIndex === 0) { // skip deletion because above is no row anymore
+      return;
+    }
+
+    this._table.deleteRow(rowIndex - 1);
+  };
+
+  /**
+   * Remove row below the given index
+   *
+   * @param {number} rowIndex - number in the array of columns, where new column to insert,-1 if insert at the end
+   */
+  removeRowBelow(rowIndex = 0) {
+    if (this._table.rows.length === 1) { // avoid deletion of first/last row
+      return;
+    }
+
+    if (this._table.rows.length === rowIndex + 1) { // skip deletion because below is no row anymore
+      return;
+    }
+
+    this._table.deleteRow(rowIndex + 1);
   };
 
   /**
@@ -112,20 +457,9 @@ export class Table {
   _fillCell(cell) {
     cell.classList.add(CSS.cell);
     const content = this._createContenteditableArea();
+    const area = create('div', [ CSS.area ], null, [ content ]);
 
-    cell.appendChild(create('div', [ CSS.area ], null, [ content ]));
-  }
-
-  /**
-   * @private
-   * @param row = the empty row
-   */
-  _fillRow(row) {
-    for (let i = 0; i < this._numberOfColumns; i++) {
-      const cell = row.insertCell();
-
-      this._fillCell(cell);
-    }
+    cell.appendChild(area);
   }
 
   /**
@@ -211,8 +545,11 @@ export class Table {
       return;
     }
 
-    const coordsCell = getCoords(event.target.closest('TD'));
+    const closestTd = event.target.closest('TD');
+    const coordsCell = getCoords(closestTd);
     const side = getSideByCoords(coordsCell, event.pageX, event.pageY);
+
+    setActiveColRow(closestTd);
 
     event.target.dispatchEvent(new CustomEvent('mouseInActivatingArea', {
       detail: {
