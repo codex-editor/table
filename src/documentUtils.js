@@ -1,48 +1,58 @@
 /**
- * Checks the item is not missed or messed
- * @param {object|string[]|Element[]|HTMLElement|string} elem - element
- * @returns {boolean} true if element is correct
- * @private
- */
-function _isNotMissed(elem) {
-  return (!(elem === undefined || elem === null));
-}
-
-/**
  * Create DOM element with set parameters
- * @param {string} tagName - Html tag of the element to be created
- * @param {string[]} cssClasses - Css classes that must be applied to an element
- * @param {object} attrs - Attributes that must be applied to the element
- * @param {Element[]} children - child elements of creating element
+ *
+ * @param {Object} element - element params to create an HTML element
+ * @param {string} element.tagName - Html tag of the element to be created
+ * @param {string[]} element.cssClasses - Css classes that must be applied to an element
+ * @param {object} element.attrs - Attributes that must be applied to the element
+ * @param {Element[]} element.children - child elements of creating element
+ * @param {string} element.innerHTML - string with html elements to set before adding childs
+ * @param {string} element.textContent - text content to set
+ *
  * @returns {HTMLElement} the new element
  */
-export function create(tagName, cssClasses = null, attrs = null, children = null) {
+export function create({
+  tagName = 'div',
+  cssClasses,
+  attrs,
+  children,
+  innerHTML,
+  textContent,
+}) {
   const elem = document.createElement(tagName);
 
-  if (_isNotMissed(cssClasses)) {
-    for (let i = 0; i < cssClasses.length; i++) {
-      if (_isNotMissed(cssClasses[i])) {
-        elem.classList.add(cssClasses[i]);
-      }
-    }
+  if (cssClasses) {
+    elem.classList.add(...cssClasses.filter(className => !!className));
   }
-  if (_isNotMissed(attrs)) {
+
+  if (attrs) {
     for (let key in attrs) {
       elem.setAttribute(key, attrs[key]);
     }
   }
-  if (_isNotMissed(children)) {
+
+  if (textContent) {
+    elem.textContent = textContent;
+  }
+
+  if (innerHTML) {
+    elem.innerHTML = innerHTML;
+  }
+
+  if (children) {
     for (let i = 0; i < children.length; i++) {
-      if (_isNotMissed(children[i])) {
-        elem.appendChild(children[i]);
+      if (children[i]) {
+        elem.append(children[i]);
       }
     }
   }
+
   return elem;
 }
 
 /**
  * Get item position relative to document
+ *
  * @param {HTMLElement} elem - item
  * @returns {{x1: number, y1: number, x2: number, y2: number}} coordinates of the upper left (x1,y1) and lower right(x2,y2) corners
  */
@@ -58,30 +68,83 @@ export function getCoords(elem) {
 }
 
 /**
- * Recognizes which side of the container  is closer to (x,y)
- * @param {{x1: number, y1: number, x2: number, y2: number}} coords - coords of container
- * @param x - x coord
- * @param y - y coord
- * @return {string}
+ * Calculate paddings of the first element relative to the second
+ *
+ * @param {HTMLElement} firstElem - outer element, if the second element is inside it, then all padding will be positive
+ * @param {HTMLElement} secondElem - inner element, if its borders go beyond the first, then the paddings will be considered negative
+ * @returns {{fromTopBorder: number, fromLeftBorder: number, fromRightBorder: number, fromBottomBorder: number}}
  */
-export function getSideByCoords(coords, x, y) {
-  let side;
-  const sizeArea = 10;
+export function getRelativeCoordsOfTwoElems(firstElem, secondElem) {
+  const firstCoords = getCoords(firstElem);
+  const secondCoords = getCoords(secondElem);
 
-  // a point is close to the boundary if the distance between them is less than the allowed distance.
-  // +1px on each side due to fractional pixels
-  if (x - coords.x1 >= -1 && x - coords.x1 <= sizeArea + 1) {
-    side = 'left';
-  }
-  if (coords.x2 - x >= -1 && coords.x2 - x <= sizeArea + 1) {
-    side = 'right';
-  }
-  if (y - coords.y1 >= -1 && y - coords.y1 <= sizeArea + 1) {
-    side = 'top';
-  }
-  if (coords.y2 - y >= -1 && coords.y2 - y <= sizeArea + 1) {
-    side = 'bottom';
-  }
+  return {
+    fromTopBorder: secondCoords.y1 - firstCoords.y1,
+    fromLeftBorder: secondCoords.x1 - firstCoords.x1,
+    fromRightBorder: firstCoords.x2 - secondCoords.x2,
+    fromBottomBorder: firstCoords.y2 - secondCoords.y2
+  };
+}
 
-  return side;
+/**
+ * Get the width and height of an element and the position of the cursor relative to it
+ *
+ * @param {HTMLElement} elem - element relative to which the coordinates will be calculated
+ * @param {Event} event - mouse event
+ */
+export function getCursorPositionRelativeToElement(elem, event) {
+  const rect = elem.getBoundingClientRect();
+  const { width, height, x, y } = rect;
+  const { clientX, clientY } = event;
+
+  return {
+    width,
+    height,
+    x: clientX - x,
+    y: clientY - y
+  };
+}
+
+/**
+ * Insert element after the referenced
+ *
+ * @param {HTMLElement} newNode
+ * @param {HTMLElement} referenceNode
+ * @returns {HTMLElement}
+ */
+export function insertAfter(newNode, referenceNode) {
+  return referenceNode.parentNode.insertBefore(newNode, referenceNode.nextSibling);
+}
+
+/**
+ * Insert element after the referenced
+ *
+ * @param {HTMLElement} newNode
+ * @param {HTMLElement} referenceNode
+ * @returns {HTMLElement}
+ */
+export function insertBefore(newNode, referenceNode) {
+  return referenceNode.parentNode.insertBefore(newNode, referenceNode);
+}
+
+/**
+ * Limits the frequency of calling a function
+ * 
+ * @param {number} delay - delay between calls in milliseconds
+ * @param {function} fn - function to be throttled
+ */
+export function throttled(delay, fn) {
+  let lastCall = 0;
+
+  return function (...args) {
+    const now = new Date().getTime();
+
+    if (now - lastCall < delay) {
+      return;
+    }
+
+    lastCall = now;
+
+    return fn(...args);
+  };
 }
